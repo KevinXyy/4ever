@@ -10,6 +10,12 @@
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		4E0000012BE8000000000001 /* NativeBridgeRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0000112BE8000000000001 /* NativeBridgeRegistry.swift */; };
+		4E0000022BE8000000000001 /* NativeErrorCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0000122BE8000000000001 /* NativeErrorCode.swift */; };
+		4E0000032BE8000000000001 /* LlmRuntimeHostApiAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0000132BE8000000000001 /* LlmRuntimeHostApiAdapter.swift */; };
+		4E0000042BE8000000000001 /* HealthKitHostApiAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0000142BE8000000000001 /* HealthKitHostApiAdapter.swift */; };
+		4E0000052BE8000000000001 /* CryptoHostApiAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0000152BE8000000000001 /* CryptoHostApiAdapter.swift */; };
+		4E0000062BE8000000000001 /* BackgroundTaskHostApiAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E0000162BE8000000000001 /* BackgroundTaskHostApiAdapter.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
@@ -46,6 +52,14 @@
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		4E0000102BE8000000000001 /* NativeBridge */ = {isa = PBXFileReference; lastKnownFileType = folder; path = NativeBridge; sourceTree = "<group>"; };
+		4E0000112BE8000000000001 /* NativeBridgeRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge/NativeBridgeRegistry.swift; sourceTree = "<group>"; };
+		4E0000122BE8000000000001 /* NativeErrorCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge/NativeErrorCode.swift; sourceTree = "<group>"; };
+		4E0000132BE8000000000001 /* LlmRuntimeHostApiAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge/LlmRuntimeHostApiAdapter.swift; sourceTree = "<group>"; };
+		4E0000142BE8000000000001 /* HealthKitHostApiAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge/HealthKitHostApiAdapter.swift; sourceTree = "<group>"; };
+		4E0000152BE8000000000001 /* CryptoHostApiAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge/CryptoHostApiAdapter.swift; sourceTree = "<group>"; };
+		4E0000162BE8000000000001 /* BackgroundTaskHostApiAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBridge/BackgroundTaskHostApiAdapter.swift; sourceTree = "<group>"; };
+		4E0000172BE8000000000001 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -120,6 +134,13 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				4E0000172BE8000000000001 /* Runner.entitlements */,
+				4E0000112BE8000000000001 /* NativeBridgeRegistry.swift */,
+				4E0000122BE8000000000001 /* NativeErrorCode.swift */,
+				4E0000132BE8000000000001 /* LlmRuntimeHostApiAdapter.swift */,
+				4E0000142BE8000000000001 /* HealthKitHostApiAdapter.swift */,
+				4E0000152BE8000000000001 /* CryptoHostApiAdapter.swift */,
+				4E0000162BE8000000000001 /* BackgroundTaskHostApiAdapter.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -271,6 +292,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E0000012BE8000000000001 /* NativeBridgeRegistry.swift in Sources */,
+				4E0000022BE8000000000001 /* NativeErrorCode.swift in Sources */,
+				4E0000032BE8000000000001 /* LlmRuntimeHostApiAdapter.swift in Sources */,
+				4E0000042BE8000000000001 /* HealthKitHostApiAdapter.swift in Sources */,
+				4E0000052BE8000000000001 /* CryptoHostApiAdapter.swift in Sources */,
+				4E0000062BE8000000000001 /* BackgroundTaskHostApiAdapter.swift in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
@@ -365,6 +392,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
@@ -544,6 +572,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
@@ -566,6 +595,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;

@@ -77,6 +77,40 @@ cd ..
 flutter run -d "iPhone Simulator"
 ```
 
+## Install On macOS
+
+Xcode setup is intentionally separate. To install the shared project toolchain
+on macOS, run from the repository root:
+
+```bash
+chmod +x scripts/setup-macos-dev.sh
+scripts/setup-macos-dev.sh
+```
+
+The script installs/configures:
+
+- FVM 4.0.5.
+- Flutter 3.41.7 through FVM.
+- uv.
+- Python 3.12.9 through uv.
+- CocoaPods.
+- Flutter package dependencies.
+- Backend uv environment.
+- Recommended VS Code extensions, if the `code` command is available.
+
+If Homebrew directories are not writable, the script asks for sudo once and
+repairs Homebrew ownership before installing tools.
+
+Optional Android tooling:
+
+```bash
+scripts/setup-macos-dev.sh --install-android-toolchain
+```
+
+This optional mode installs Android command line tools, Android Studio,
+platform-tools, Android SDK 36, and build-tools 36.0.0, then accepts SDK
+licenses.
+
 ## Install On Windows
 
 From the repository root:

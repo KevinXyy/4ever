@@ -10,6 +10,15 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 .\scripts\setup-windows-dev.ps1
 ```
 
+## macOS Setup
+
+Xcode is handled separately. For Flutter/FVM/uv/Python setup:
+
+```bash
+chmod +x scripts/setup-macos-dev.sh
+scripts/setup-macos-dev.sh
+```
+
 ## Common Commands
 
 ```powershell
