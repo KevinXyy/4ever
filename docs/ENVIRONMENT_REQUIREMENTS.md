@@ -11,7 +11,7 @@ Windows is suitable for:
 - Domain, application, data, privacy, prompt, and safety modules.
 - Pigeon API definitions.
 - FastAPI backend development.
-- Web and Windows desktop preview.
+- Flutter web preview.
 - Git and GitHub collaboration.
 
 Windows cannot independently perform:
@@ -46,7 +46,6 @@ Already expected by `scripts/setup-windows-dev.ps1`:
 Optional:
 
 - Android Studio and Android SDK, only if Android testing is needed on Windows.
-- Visual Studio Community with Desktop development with C++, only if Windows desktop builds are needed.
 
 ## iOS Development Machine
 
@@ -106,7 +105,6 @@ Expected Windows-only `flutter doctor` status:
 - Flutter: pass.
 - Windows version: pass.
 - Chrome: pass.
-- Visual Studio: pass if Windows desktop support is installed.
 - Android toolchain: may fail unless Android Studio/SDK is installed.
 - iOS toolchain: not available on Windows by design.
 
