@@ -1,0 +1,15 @@
+enum HealthMetricType {
+  steps,
+  sleepSession,
+  sleepStage,
+  exerciseSession,
+  activeEnergy,
+  heartRate,
+  restingHeartRate,
+  hrv,
+  weight,
+  mindfulMinutes,
+  mood,
+  stress,
+  energy,
+}

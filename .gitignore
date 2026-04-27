@@ -1,0 +1,44 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+
+# Environment
+.env
+.env.*
+!.env.example
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# FVM version cache
+.fvm/
+
+# Flutter / Dart
+**/.dart_tool/
+**/.packages
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/build/
+
+# Native build outputs
+**/android/.gradle/
+**/android/local.properties
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/ephemeral/
+**/windows/flutter/ephemeral/
+
+# Logs
+*.log
+
+# Local reference repositories
+/Waico/
+/gallery/
+
+# Pytest temp directories sometimes created on Windows
+server/pytest-cache-files-*/

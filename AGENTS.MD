@@ -1,0 +1,1870 @@
+# 端侧 AI App 技术栈
+
+版本：0.1
+
+项目形态：iOS / Android 双端 Flutter App，端侧 AI 优先，本地健康数据管理，本地隐私脱敏，云端仅分析脱敏后的结构化摘要。
+
+## 0. 背景与技术判断
+
+本项目选择 **Flutter** 作为跨平台 App 主框架，使用 **Dart** 实现 UI、业务编排、健康画像、隐私脱敏、云端同步和本地状态管理。Android 与 iOS 端的系统级能力通过原生插件接入：Android 使用 **Kotlin**，iOS 使用 **Swift**。
+
+端侧模型以 **Gemma 4 E4B** 为主模型，已在iPhone 17 上验证 安卓端待确认 
+
+```
+Gemma 4 是默认目标模型。
+Gemma 4 不直接暴露给业务层。
+业务层只依赖统一的 LlmRuntime 接口。
+Android / iOS 各自实现原生 runtime adapter。
+所有模型、云端 AI、fallback 模型都必须可替换。
+```
+
+## 1. 总体架构
+
+```
+Flutter App
+│
+├── Presentation Layer
+│   ├── Onboarding
+│   ├── Health Dashboard
+│   ├── AI Companion Chat
+│   ├── Daily Check-in
+│   ├── Insight Cards
+│   ├── Privacy Review
+│   ├── Model Status
+│   └── Settings
+│
+├── Application Layer
+│   ├── HealthImportService
+│   ├── HealthSummaryService
+│   ├── LocalCoachService
+│   ├── PrivacyFilterService
+│   ├── CloudAnalysisService
+│   ├── ModelLifecycleService
+│   └── RiskBoundaryService
+│
+├── Domain Layer
+│   ├── HealthSignal
+│   ├── HealthSample
+│   ├── MoodLog
+│   ├── BehaviorEvent
+│   ├── DailySummary
+│   ├── UserHealthProfile
+│   ├── AnonymizedCloudPayload
+│   └── WellbeingInsight
+│
+├── Data Layer
+│   ├── EncryptedLocalDatabase
+│   ├── HealthRepository
+│   ├── MoodRepository
+│   ├── ModelRepository
+│   ├── SecureKeyRepository
+│   └── CloudRepository
+│
+├── Native Bridge Layer
+│   ├── LlmRuntimeApi
+│   ├── HealthDataApi
+│   ├── CryptoApi
+│   ├── ModelStorageApi
+│   └── BackgroundTaskApi
+│
+├── Android Native Layer
+│   ├── Kotlin
+│   ├── Gemma 4 Runtime Adapter
+│   ├── Health Connect Adapter
+│   ├── Android Keystore Adapter
+│   └── WorkManager Adapter
+│
+└── iOS Native Layer
+    ├── Swift
+    ├── Gemma 4 Runtime Adapter
+    ├── HealthKit Adapter
+    ├── Keychain / CryptoKit Adapter
+    └── BackgroundTasks Adapter
+```
+
+Flutter 官方支持通过 platform channel 调用 Android Kotlin / Java 和 iOS Swift / Objective-C 原生代码；Pigeon 可生成类型安全的宿主 API，减少 Dart 与平台端手写字符串协议不一致的问题。([Flutter 文档](https://docs.flutter.dev/platform-integration/platform-channels?sid=TMUlf1&utm_source=chatgpt.com))
+
+默认采用 **Pigeon 优先，手写 MethodChannel 例外** 的桥接策略。
+
+## 2. 技术栈总表
+
+| 模块 | 选型 | 说明 |
+| --- | --- | --- |
+| App 框架 | Flutter | 双端 UI、业务编排、页面导航 |
+| 主语言 | Dart | Flutter 业务层、领域模型、隐私处理 |
+| Android 原生 | Kotlin | Gemma runtime、Health Connect、Keystore、后台任务 |
+| iOS 原生 | Swift | Gemma runtime、HealthKit、Keychain、BackgroundTasks |
+| 状态管理 | Riverpod | 异步状态、依赖注入、测试友好 |
+| 路由 | go_router | 声明式路由、deep link、ShellRoute |
+| 数据模型 | freezed + json_serializable | 不可变模型、序列化、copyWith |
+| Native Bridge | Pigeon | 类型安全平台桥接 |
+| 本地数据库 | SQLCipher SQLite | 文件级加密数据库 |
+| Flutter DB 包 | sqflite_sqlcipher | Android / iOS / macOS 支持，openDatabase 支持 password 参数；包文档要求 release 混淆时保留 SQLCipher 类。([Dart packages](https://pub.dev/packages/sqflite_sqlcipher?utm_source=chatgpt.com)) |
+| 密钥存储 | flutter_secure_storage + 原生 Keychain / Keystore | Flutter 层存储小型敏感数据；关键密钥应由原生层生成和保护 |
+| 健康数据 | HealthKit + Health Connect | iOS 与 Android 系统健康数据源 |
+| 健康数据 Flutter 包 | health | 可作为早期 adapter；该包是 Apple HealthKit 与 Google Health Connect 的 wrapper。([Dart packages](https://pub.dev/packages/health?utm_source=chatgpt.com)) |
+| 端侧模型 | Gemma 4 E2B | 默认主模型 |
+| 模型运行时 | LiteRT-LM / Google AI Edge / MediaPipe GenAI 相关 runtime | 平台端封装，不暴露给业务层 |
+| 云端服务 | FastAPI 或 Cloudflare Workers | 云端只接收脱敏摘要 |
+| 云端 AI | 可插拔 LLM API | 不接收原始健康数据 |
+| CI/CD | GitHub Actions + Fastlane | 静态检查、测试、构建、发布 |
+| 版本管理 | FVM + lockfile | 固定 Flutter SDK 与依赖版本 |
+
+## 3. Flutter 工程规范
+
+### 3.1 Flutter SDK
+
+使用 FVM 固定 Flutter 版本。
+
+```bash
+fvm install stable
+fvm use stable
+```
+
+如果使用 `sqflite_sqlcipher 3.4.0`，需注意其 changelog 标注最低 Flutter 版本更新到 3.35 以支持 Android SDK 36。([Dart packages](https://pub.dev/packages/sqflite_sqlcipher/changelog?utm_source=chatgpt.com))
+
+仓库必须提交：
+
+```
+.fvmrc
+pubspec.lock
+analysis_options.yaml
+```
+
+AI agent 不得随意升级 Flutter SDK 或大版本依赖。升级必须单独 PR，并包含：
+
+```
+依赖变更说明
+flutter analyze 结果
+flutter test 结果
+Android build 结果
+iOS build 结果
+回滚方式
+```
+
+### 3.2 推荐依赖
+
+`pubspec.yaml` 初始依赖建议如下。实际版本以创建项目时 `pub.dev` 最新稳定版本为准，但必须锁定 `pubspec.lock`。
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^3.3.1
+  riverpod_annotation: ^3.0.0
+
+  # Routing
+  go_router: ^17.2.2
+
+  # Data model and serialization
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+
+  # Native bridge
+  pigeon: ^26.0.0
+
+  # Network
+  dio: ^5.0.0
+  retrofit: ^4.0.0
+
+  # Local encrypted database
+  sqflite_sqlcipher: ^3.4.0
+  path_provider: ^2.1.0
+  path: ^1.9.0
+
+  # Secure storage
+  flutter_secure_storage: ^10.0.0
+  cryptography: ^2.7.0
+
+  # Health data
+  health: ^13.3.1
+  permission_handler: ^12.0.0
+
+  # Device and system
+  device_info_plus: ^12.0.0
+  package_info_plus: ^9.0.0
+  connectivity_plus: ^7.0.0
+
+  # Background and downloads
+  background_downloader: ^9.0.0
+  workmanager: ^0.9.0
+
+  # UI
+  fl_chart: ^1.0.0
+  flutter_markdown: ^0.7.0
+  shimmer: ^3.0.0
+  intl: ^0.20.0
+
+  # Notifications
+  flutter_local_notifications: ^19.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  integration_test:
+    sdk: flutter
+
+  build_runner: ^2.5.0
+  freezed: ^3.0.0
+  json_serializable: ^6.9.0
+  retrofit_generator: ^10.0.0
+  riverpod_generator: ^3.0.0
+
+  flutter_lints: ^6.0.0
+  very_good_analysis: ^9.0.0
+
+  mocktail: ^1.0.0
+  golden_toolkit: ^0.15.0
+```
+
+Riverpod 当前包说明强调其适合异步代码、错误/加载状态处理，以及将逻辑与 UI 分离；这与本项目大量异步健康数据、模型加载、云端分析任务匹配。([Dart packages](https://pub.dev/packages/flutter_riverpod?utm_source=chatgpt.com))
+
+go_router 是 Flutter 团队发布的声明式路由包，支持 deep link、路径参数、重定向、ShellRoute 和多 Navigator。([Dart packages](https://pub.dev/packages/go_router?utm_source=chatgpt.com))
+
+flutter_secure_storage 当前文档说明其在 iOS 使用 Keychain，在 Android 使用加密存储，并提供 Android KeyStore / AES-GCM 等选项；本项目可用它保存小型敏感配置，但数据库主密钥建议由原生层生成和保护。([Dart packages](https://pub.dev/packages/flutter_secure_storage?utm_source=chatgpt.com))
+
+### 3.3 目录结构
+
+```
+app/
+  lib/
+    main.dart
+    bootstrap.dart
+    app.dart
+
+    core/
+      config/
+        app_config.dart
+        flavor.dart
+        environment.dart
+
+      errors/
+        app_error.dart
+        error_code.dart
+        error_mapper.dart
+
+      logging/
+        redacted_logger.dart
+        log_event.dart
+
+      security/
+        secure_key_store.dart
+        encryption_service.dart
+        pii_detector.dart
+
+      native/
+        generated/
+          llm_runtime_api.g.dart
+          health_data_api.g.dart
+          crypto_api.g.dart
+        llm_runtime_api.dart
+        health_data_api.dart
+        crypto_api.dart
+
+      privacy/
+        privacy_filter.dart
+        anonymization_policy.dart
+        sensitivity_classifier.dart
+        upload_policy.dart
+
+      utils/
+        clock.dart
+        result.dart
+        uuid.dart
+        date_range.dart
+
+    domain/
+      health/
+        health_metric_type.dart
+        health_sample.dart
+        health_signal.dart
+        daily_health_snapshot.dart
+        weekly_health_snapshot.dart
+        sleep_summary.dart
+        workout_summary.dart
+        heart_rate_summary.dart
+
+      mood/
+        mood_log.dart
+        mood_score.dart
+
+      behavior/
+        behavior_event.dart
+        behavior_event_type.dart
+
+      ai/
+        llm_model_config.dart
+        llm_generation_config.dart
+        llm_response.dart
+        llm_token_event.dart
+        llm_runtime_status.dart
+        prompt_context.dart
+
+      insight/
+        daily_summary.dart
+        weekly_insight.dart
+        recommendation.dart
+        risk_flag.dart
+
+      privacy/
+        anonymized_cloud_payload.dart
+        sensitivity_level.dart
+        redaction_report.dart
+
+    data/
+      db/
+        encrypted_database.dart
+        database_key_provider.dart
+        migrations/
+          migration_001.dart
+          migration_002.dart
+        dao/
+          health_sample_dao.dart
+          mood_log_dao.dart
+          daily_summary_dao.dart
+          model_registry_dao.dart
+          cloud_job_dao.dart
+
+      repositories/
+        health_repository_impl.dart
+        mood_repository_impl.dart
+        model_repository_impl.dart
+        cloud_repository_impl.dart
+        user_profile_repository_impl.dart
+
+      api/
+        cloud_api_client.dart
+        dto/
+          analyze_request_dto.dart
+          analyze_response_dto.dart
+
+    application/
+      health/
+        health_import_service.dart
+        health_normalization_service.dart
+        health_snapshot_service.dart
+
+      ai/
+        agent/
+          agent_runtime.dart
+          agent_tool_registry.dart
+        local_summary_service.dart
+        wellbeing_coach_service.dart
+        model_lifecycle_service.dart
+        prompt_builder.dart
+        prompt_templates.dart
+
+      privacy/
+        local_redaction_service.dart
+        upload_review_service.dart
+        privacy_audit_service.dart
+
+      sync/
+        cloud_analysis_service.dart
+        sync_queue_service.dart
+
+      safety/
+        risk_boundary_service.dart
+        medical_safety_guard.dart
+
+    presentation/
+      onboarding/
+      dashboard/
+      checkin/
+      chat/
+      insights/
+      privacy_review/
+      model_status/
+      settings/
+
+  pigeon/
+    llm_runtime_api.dart
+    health_data_api.dart
+    crypto_api.dart
+    background_task_api.dart
+
+  android/
+    app/src/main/kotlin/com/company/app/
+      LlmRuntimeHostApi.kt
+      HealthConnectHostApi.kt
+      CryptoHostApi.kt
+      BackgroundTaskHostApi.kt
+
+  ios/
+    Runner/
+      LlmRuntimeHostApi.swift
+      HealthKitHostApi.swift
+      CryptoHostApi.swift
+      BackgroundTaskHostApi.swift
+```
+
+### 3.4 分层依赖规则
+
+```
+presentation 可以依赖 application 和 domain。
+application 可以依赖 domain 和 repository interface。
+domain 不得依赖 Flutter、数据库、网络、原生桥接。
+data 实现 repository interface。
+native bridge 只能通过 application 或 data adapter 被调用。
+UI 不得直接调用 Pigeon 生成 API。
+UI 不得直接访问数据库。
+UI 不得直接访问 HealthKit / Health Connect。
+UI 不得直接访问 Gemma runtime。
+```
+
+## 4. Native Bridge 规范
+
+### 4.1 Pigeon 优先
+
+本项目使用 Pigeon 定义跨平台接口。手写 `MethodChannel` 仅用于：
+
+```
+token streaming
+高频事件流
+Pigeon 不支持或实现成本明显过高的特殊场景
+```
+
+Flutter 文档说明，Pigeon 可生成结构化、类型安全的平台消息代码，避免 host 与 client 手动匹配字符串、参数名和数据类型。([Flutter 文档](https://docs.flutter.dev/platform-integration/platform-channels?sid=TMUlf1&utm_source=chatgpt.com))
+
+### 4.2 LLM Runtime Host API
+
+`app/pigeon/llm_runtime_api.dart`
+
+```dart
+import 'package:pigeon/pigeon.dart';
+
+class NativeLlmModelConfig {
+  String modelId;
+  String localPath;
+  String sha256;
+  int sizeBytes;
+  int minMemoryGb;
+  bool supportsText;
+  bool supportsImage;
+  bool supportsAudio;
+  bool supportsThinking;
+  int maxContextTokens;
+
+  NativeLlmModelConfig({
+    required this.modelId,
+    required this.localPath,
+    required this.sha256,
+    required this.sizeBytes,
+    required this.minMemoryGb,
+    required this.supportsText,
+    required this.supportsImage,
+    required this.supportsAudio,
+    required this.supportsThinking,
+    required this.maxContextTokens,
+  });
+}
+
+class NativeGenerationConfig {
+  double temperature;
+  int topK;
+  double topP;
+  int maxTokens;
+  bool enableThinking;
+
+  NativeGenerationConfig({
+    required this.temperature,
+    required this.topK,
+    required this.topP,
+    required this.maxTokens,
+    required this.enableThinking,
+  });
+}
+
+class NativeLlmStatus {
+  String state;
+  String? errorCode;
+  String? errorMessage;
+  int? usedMemoryMb;
+  String? loadedModelId;
+
+  NativeLlmStatus({
+    required this.state,
+    this.errorCode,
+    this.errorMessage,
+    this.usedMemoryMb,
+    this.loadedModelId,
+  });
+}
+
+@HostApi()
+abstract class LlmRuntimeHostApi {
+  @async
+  void initialize(NativeLlmModelConfig config);
+
+  @async
+  String generateOnce(String prompt, NativeGenerationConfig config);
+
+  @async
+  void cancel();
+
+  @async
+  void unload();
+
+  @async
+  NativeLlmStatus getStatus();
+}
+```
+
+Streaming 使用独立 EventChannel：
+
+```
+channel: com.company.app/llm_token_stream
+event payload:
+{
+  "request_id": "...",
+  "type": "token|thinking|done|error",
+  "text": "...",
+  "error_code": null
+}
+```
+
+### 4.3 错误归一化
+
+原生层必须把 SDK 错误转换为统一错误码：
+
+```
+MODEL_FILE_NOT_FOUND
+MODEL_HASH_MISMATCH
+MODEL_LOAD_FAILED
+MODEL_UNSUPPORTED_DEVICE
+MODEL_OUT_OF_MEMORY
+MODEL_RUNTIME_INTERNAL
+GENERATION_CANCELLED
+GENERATION_TIMEOUT
+GENERATION_EMPTY_OUTPUT
+NATIVE_PERMISSION_DENIED
+UNKNOWN
+```
+
+Dart 层不得解析原生 SDK 原始错误字符串作为业务逻辑依据。
+
+## 5. Gemma 4 与本地模型运行时
+
+### 5.1 模型策略
+
+默认模型：
+
+```
+Gemma 4 E2B
+```
+
+高级设备可选：
+
+```
+Gemma 4 E4B
+```
+
+fallback：
+
+```
+Gemma3-1B-IT
+Gemma 3n E2B
+Cloud redacted analysis
+```
+
+Edge Gallery 的 Android allowlist 中，Gemma 4 E2B 模型文件约 2.58GB，最低设备内存 8GB，支持图像、音频、thinking、32K context；Gemma 4 E4B 约 3.65GB，最低设备内存 12GB，同样支持图像、音频、thinking、32K context。
+
+### 5.2 Runtime 抽象
+
+Dart interface：
+
+```dart
+abstract interface class LlmRuntime {
+  Future<void> initialize(LlmModelConfig config);
+
+  Stream<LlmTokenEvent> generateStream({
+    required String prompt,
+    List<LlmAttachment> attachments = const [],
+    LlmGenerationConfig config = const LlmGenerationConfig(),
+  });
+
+  Future<LlmResponse> generateOnce({
+    required String prompt,
+    List<LlmAttachment> attachments = const [],
+    LlmGenerationConfig config = const LlmGenerationConfig(),
+  });
+
+  Future<LlmRuntimeStatus> getStatus();
+
+  Future<void> cancel();
+
+  Future<void> unload();
+}
+```
+
+业务层只接触该接口。禁止：
+
+```dart
+// 禁止
+Gemma4Runtime().generate(...);
+LiteRtLmSession().generate(...);
+MediaPipeLlmInference().run(...);
+```
+
+允许：
+
+```dart
+final response = await ref.read(llmRuntimeProvider).generateOnce(
+  prompt: prompt,
+  config: generationConfig,
+);
+```
+
+### 5.3 模型 manifest
+
+`assets/model_manifest.json`
+
+```json
+{
+  "schema_version": "1.0",
+  "models": [
+    {
+      "id": "gemma-4-e2b-it",
+      "display_name": "Gemma 4 E2B",
+      "file_name": "gemma-4-E2B-it.litertlm",
+      "sha256": "TO_BE_FILLED",
+      "size_bytes": 2583085056,
+      "min_memory_gb": 8,
+      "modalities": ["text", "image", "audio"],
+      "supports_thinking": true,
+      "max_context_tokens": 32000,
+      "default": true,
+      "platforms": ["android", "ios"]
+    },
+    {
+      "id": "gemma-4-e4b-it",
+      "display_name": "Gemma 4 E4B",
+      "file_name": "gemma-4-E4B-it.litertlm",
+      "sha256": "TO_BE_FILLED",
+      "size_bytes": 3654467584,
+      "min_memory_gb": 12,
+      "modalities": ["text", "image", "audio"],
+      "supports_thinking": true,
+      "max_context_tokens": 32000,
+      "default": false,
+      "platforms": ["android", "ios"]
+    },
+    {
+      "id": "gemma3-1b-it",
+      "display_name": "Gemma3 1B IT",
+      "file_name": "gemma3-1b-it-int4.litertlm",
+      "sha256": "TO_BE_FILLED",
+      "size_bytes": 584417280,
+      "min_memory_gb": 4,
+      "modalities": ["text"],
+      "supports_thinking": false,
+      "max_context_tokens": 4096,
+      "fallback": true,
+      "platforms": ["android", "ios"]
+    }
+  ]
+}
+```
+
+### 5.4 模型生命周期 (待定）
+
+```
+not_installed
+downloading
+verifying
+installed
+loading
+ready
+failed
+unloaded
+```
+
+模型安装流程：
+
+```
+1. 检查设备内存与磁盘空间。
+2. 获取模型文件。
+3. 计算 SHA-256。
+4. 校验 manifest。
+5. 写入 model_registry。
+6. 初始化原生 runtime。
+7. 执行 smoke test。
+8. 标记 ready。
+```
+
+Smoke test：
+
+```
+Prompt: Reply with the single word: ready
+Expected: output contains "ready"
+Timeout: 30 seconds
+```
+
+### 5.5 模型部署注意事项
+
+生产环境不建议把 2GB+ 模型直接放进 App 初始包：
+
+```
+首次启动后按需下载。
+用户明确确认模型大小。
+支持 Wi-Fi only 下载。
+支持断点续传。
+支持删除模型。
+支持 fallback 小模型。
+支持模型完整性校验。
+```
+
+如果必须内置模型，需评估：
+
+```
+App Store / Play Store 包大小限制
+初次安装成功率
+热更新策略
+模型许可证
+设备存储空间
+审核材料
+```
+
+## 6. 健康数据层
+
+### 6.1 iOS HealthKit
+
+HealthKit 数据属于高敏感数据。Apple 文档说明，HealthKit 要求用户对每个数据类型显式授权；用户可按类型分别允许或拒绝读写。App 请求 HealthKit 权限时必须包含 `NSHealthShareUsageDescription` 和 `NSHealthUpdateUsageDescription`，否则会崩溃。([Apple Developer](https://developer.apple.com/documentation/healthkit/protecting-user-privacy?utm_source=chatgpt.com))
+
+iOS 原生层职责：
+
+```
+请求 HealthKit 权限。
+读取用户授权的健康数据。
+把 HealthKit 类型映射到统一 HealthMetricType。
+不得把原始 HealthKit 数据直接上传。
+不得在日志中打印 HealthKit 原始样本。
+```
+
+`Info.plist` 必须包含：
+
+```xml
+<key>NSHealthShareUsageDescription</key>
+<string>We use your health data locally to generate private wellbeing insights.</string>
+
+<key>NSHealthUpdateUsageDescription</key>
+<string>We may write wellbeing records only if you explicitly enable this feature.</string>
+```
+
+第一版默认只读，不写 HealthKit。只有用户明确开启“写入正念记录 / 运动计划”等功能时，才申请写权限。
+
+### 6.2 Android Health Connect
+
+Health Connect 使用数据类型与权限声明模型。Android 官方文档说明，发布到 Play Store 前必须声明应用使用的 Health Connect 数据类型，否则用户可能无法授权访问对应类型。文档还说明后台读取、读取 30 天以前历史数据需要额外权限声明。([Android Developers](https://developer.android.com/health-and-fitness/health-connect/data-types?utm_source=chatgpt.com))
+
+Android 原生层职责：
+
+```
+检查 Health Connect 可用性。
+声明所需 Health Connect 权限。
+请求用户授权。
+读取用户授权的数据类型。
+处理后台读取与历史读取权限。
+把 Health Connect records 映射为统一 HealthSample。
+```
+
+### 6.3 默认读取数据类型
+
+第一阶段允许读取：
+
+```
+步数
+睡眠
+运动分钟
+运动记录
+活动能量
+心率
+静息心率
+HRV
+体重
+正念分钟
+用户主动输入的 mood / stress / energy
+```
+
+默认不读取：
+
+```
+病历
+用药
+生殖健康
+血糖
+血压
+精确运动路线
+精确位置
+联系人
+原始日记全文
+```
+
+若后续引入高敏感医疗数据，必须单独设计权限页、隐私页、数据生命周期和云端策略。
+
+### 6.4 Domain Model
+
+```dart
+enum HealthMetricType {
+  steps,
+  sleepSession,
+  sleepStage,
+  exerciseSession,
+  activeEnergy,
+  heartRate,
+  restingHeartRate,
+  hrv,
+  weight,
+  mindfulMinutes,
+  mood,
+  stress,
+  energy,
+}
+
+enum SensitivityLevel {
+  low,
+  medium,
+  high,
+  restricted,
+}
+
+class HealthSample {
+  final String id;
+  final HealthMetricType type;
+  final double? numericValue;
+  final String? textValue;
+  final String unit;
+  final DateTime startTime;
+  final DateTime endTime;
+  final String source;
+  final SensitivityLevel sensitivity;
+  final Map<String, Object?> metadata;
+}
+```
+
+敏感等级规则：
+
+```
+low:
+  steps, active minutes, generic exercise duration
+
+medium:
+  sleep, heart rate, resting heart rate, HRV, weight
+
+high:
+  mood, stress, journal-derived summary, inferred burnout signals
+
+restricted:
+  medical records, medication, reproductive health, precise location, raw journal, raw chat transcript
+```
+
+## 7. 本地数据库与加密
+
+### 7.1 数据库选型
+
+使用：
+
+```
+sqflite_sqlcipher + SQLCipher
+```
+
+sqflite_sqlcipher 是 sqflite 的 SQLCipher fork，文档说明它在 iOS 和 Android 上使用 SQLCipher，本体 API 接近 sqflite，但 `openDatabase` 增加 `password` 参数。([Dart packages](https://pub.dev/packages/sqflite_sqlcipher?utm_source=chatgpt.com))
+
+SQLCipher 是 SQLite 的加密 fork，提供数据库文件 256-bit AES 加密、tamper detection、memory sanitization、key derivation 等能力。([GitHub](https://github.com/sqlcipher/sqlcipher?utm_source=chatgpt.com))
+
+### 7.2 密钥策略
+
+```
+每次安装生成一个 256-bit databaseKey。
+databaseKey 不写入数据库。
+iOS 使用 Keychain 保存或包装密钥。
+Android 使用 Keystore 保存或包装密钥。
+数据库使用 SQLCipher 文件级加密。
+restricted / high 字段再做字段级加密。
+日志永远不输出 databaseKey、明文健康数据、prompt、LLM response。
+```
+
+### 7.3 数据库 schema
+
+```sql
+CREATE TABLE health_samples (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  numeric_value REAL,
+  text_value_encrypted BLOB,
+  unit TEXT NOT NULL,
+  start_time INTEGER NOT NULL,
+  end_time INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  sensitivity TEXT NOT NULL,
+  metadata_encrypted BLOB,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_health_samples_type_time
+ON health_samples(type, start_time, end_time);
+
+CREATE TABLE mood_logs (
+  id TEXT PRIMARY KEY,
+  mood_score INTEGER NOT NULL,
+  stress_score INTEGER,
+  energy_score INTEGER,
+  note_encrypted BLOB,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE behavior_events (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  metadata_encrypted BLOB,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE daily_summaries (
+  date TEXT PRIMARY KEY,
+  local_summary_encrypted BLOB NOT NULL,
+  structured_json_encrypted BLOB NOT NULL,
+  model_id TEXT,
+  prompt_version TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE user_health_profile (
+  key TEXT PRIMARY KEY,
+  value_encrypted BLOB NOT NULL,
+  confidence REAL NOT NULL,
+  source TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE cloud_analysis_jobs (
+  id TEXT PRIMARY KEY,
+  payload_hash TEXT NOT NULL,
+  anonymized_payload_encrypted BLOB NOT NULL,
+  result_encrypted BLOB,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  completed_at INTEGER
+);
+
+CREATE TABLE model_registry (
+  model_id TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
+  local_path TEXT,
+  sha256 TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  min_memory_gb INTEGER,
+  supports_text INTEGER NOT NULL,
+  supports_image INTEGER NOT NULL,
+  supports_audio INTEGER NOT NULL,
+  supports_thinking INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE privacy_audit_log (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  payload_hash TEXT,
+  redaction_version TEXT,
+  created_at INTEGER NOT NULL
+);
+```
+
+### 7.4 Migration 规则
+
+```
+任何 schema 变更必须新增 migration 文件。
+不得直接修改历史 migration。
+migration 必须有单元测试。
+migration 必须支持从前两个 release 版本升级。
+migration 失败时不得删除数据库。
+```
+
+## 8. 隐私、脱敏与云端边界
+
+### 8.1 核心原则
+
+```
+原始健康数据不出端。
+原始聊天不出端。
+原始日记不出端。
+云端只接收结构化、去标识化、低粒度摘要。
+上传前必须经过本地 PrivacyFilter。
+上传前必须生成 RedactionReport。
+用户必须能查看本次上传的字段。
+```
+
+### 8.2 禁止上传
+
+```
+姓名
+邮箱
+手机号
+精确生日
+精确地址
+精确经纬度
+联系人
+设备唯一 ID
+广告 ID
+原始 HealthKit / Health Connect 样本
+原始心率时间线
+原始睡眠阶段时间线
+原始聊天全文
+原始日记全文
+病历原文
+用药原文
+运动路线
+任何可逆身份标识
+```
+
+### 8.3 允许上传
+
+允许上传的内容只能是脱敏摘要：
+
+```json
+{
+  "schema_version": "1.0",
+  "period_days": 7,
+  "timezone_region": "Asia",
+  "age_bucket": "25-34",
+  "sleep_avg_hours": 6.4,
+  "sleep_variability": "high",
+  "step_avg": 6800,
+  "exercise_minutes_total": 95,
+  "resting_heart_rate_trend": "slightly_up",
+  "mood_trend": "declining",
+  "stress_signals": [
+    "short_sleep",
+    "low_activity",
+    "negative_checkin"
+  ],
+  "goal": "improve_sleep_consistency"
+}
+```
+
+### 8.4 PrivacyFilter 处理流程
+
+```
+Raw Local Data
+  ↓
+Normalize
+  ↓
+Aggregate
+  ↓
+Remove direct identifiers
+  ↓
+Generalize time
+  ↓
+Generalize age
+  ↓
+Remove exact location
+  ↓
+Remove raw text
+  ↓
+Sensitivity filtering
+  ↓
+Generate RedactionReport
+  ↓
+User Privacy Review
+  ↓
+Encrypted upload
+```
+
+### 8.5 RedactionReport
+
+```dart
+class RedactionReport {
+  final String redactionVersion;
+  final List<String> removedFields;
+  final List<String> generalizedFields;
+  final List<String> retainedFields;
+  final bool containsDirectIdentifiers;
+  final bool containsRawHealthSamples;
+  final bool containsRawJournalText;
+  final bool containsPreciseLocation;
+}
+```
+
+上传条件：
+
+```
+containsDirectIdentifiers == false
+containsRawHealthSamples == false
+containsRawJournalText == false
+containsPreciseLocation == false
+```
+
+不满足即阻断上传。
+
+## 9. 云端 API 规范
+
+### 9.1 云端定位
+
+云端只做：
+
+```
+长期趋势分析
+复杂归纳
+非诊断性 wellbeing insight
+结构化建议生成
+多周趋势解释
+```
+
+云端不做：
+
+```
+诊断
+治疗
+处方
+用药建议
+急救判断
+接收原始健康数据
+接收原始聊天
+接收原始日记
+```
+
+### 9.2 后端技术栈
+
+```
+Python 3.12+
+FastAPI
+Pydantic
+Uvicorn
+httpx
+structlog
+pytest
+ruff
+mypy
+```
+
+部署优先级：
+
+```
+Cloud Run
+Fly.io
+Render
+Cloudflare Workers, if TypeScript backend is preferred
+```
+
+### 9.3 后端目录
+
+```
+server/
+  app/
+    main.py
+    config.py
+
+    api/
+      routes/
+        analyze.py
+        health.py
+
+    schemas/
+      cloud_payload.py
+      insight.py
+      safety.py
+
+    services/
+      llm_client.py
+      safety_guard.py
+      recommendation_engine.py
+      redaction_validator.py
+
+    observability/
+      logging.py
+      request_id.py
+
+  tests/
+    test_redaction_validator.py
+    test_analyze.py
+    test_safety_guard.py
+
+  pyproject.toml
+  Dockerfile
+```
+
+### 9.4 API
+
+`POST /v1/analyze/weekly`
+
+Request：
+
+```json
+{
+  "schema_version": "1.0",
+  "client_generated_id": "uuid",
+  "period": {
+    "start_date": "2026-04-18",
+    "end_date": "2026-04-24",
+    "timezone_region": "Asia"
+  },
+  "health_summary": {
+    "sleep_avg_hours": 6.4,
+    "sleep_variability": "high",
+    "step_avg": 6800,
+    "exercise_minutes_total": 95,
+    "mood_trend": "declining",
+    "stress_signals": ["short_sleep", "low_activity"]
+  },
+  "privacy": {
+    "contains_raw_health_data": false,
+    "contains_direct_identifiers": false,
+    "contains_raw_journal": false,
+    "contains_precise_location": false,
+    "local_redaction_version": "2026.04.25"
+  }
+}
+```
+
+Response：
+
+```json
+{
+  "schema_version": "1.0",
+  "summary": "Your sleep pattern was less consistent this week, and lower activity may be contributing to reduced energy.",
+  "insights": [
+    {
+      "category": "sleep",
+      "severity": "medium",
+      "title": "Sleep schedule variability",
+      "explanation": "Your average sleep duration was acceptable, but the timing varied across the week.",
+      "suggestion": "Try setting a consistent wind-down time for the next three nights."
+    }
+  ],
+  "non_medical_disclaimer": "This is wellbeing guidance, not a diagnosis or medical treatment."
+}
+```
+
+### 9.5 云端日志规则
+
+```
+不得记录 request body。
+不得记录 prompt 明文。
+不得记录 LLM response 明文。
+日志只记录 request_id、schema_version、error_code、latency_ms。
+调试环境也不得绕过该规则。
+```
+
+## 10. AI 工作流与 Prompt 规范
+
+### 10.1 本地 Daily Summary
+
+用途：把本地健康数据转换为用户可读的每日摘要。
+
+```
+System:
+You are a privacy-first wellbeing assistant.
+You do not diagnose, prescribe, or provide medical treatment.
+You summarize local health and behavior signals into non-medical wellbeing insights.
+Do not mention raw identifiers.
+Keep the output structured.
+
+Input:
+- sleep duration
+- sleep schedule consistency
+- steps
+- exercise minutes
+- heart rate trend
+- mood check-in
+- user goal
+
+Output JSON:
+{
+  "summary": "...",
+  "signals": [],
+  "possible_factors": [],
+  "suggested_actions": [],
+  "risk_level": "low|medium|high",
+  "needs_professional_help": false
+}
+```
+
+### 10.2 本地 Wellbeing Coach
+
+```
+System:
+You are a wellbeing coach, not a doctor.
+Use supportive, practical, non-diagnostic language.
+Do not diagnose disease.
+Do not prescribe medication.
+Do not advise the user to stop medication.
+If the user asks for medical diagnosis, medication, or urgent care advice, redirect them to a qualified professional.
+
+Context:
+{local_health_profile}
+{recent_daily_summaries}
+
+User:
+{message}
+```
+
+### 10.3 Privacy Filter Prompt
+
+```
+System:
+You are a local privacy filter.
+Your task is to transform sensitive local health context into a de-identified, structured summary.
+Remove all direct identifiers, exact timestamps, exact locations, raw journal text, raw chat content, and raw health samples.
+Return only JSON.
+
+Input:
+{local_summary}
+
+Output:
+{
+  "safe_to_upload": true,
+  "removed_fields": [],
+  "generalized_fields": [],
+  "payload": {}
+}
+```
+
+### 10.4 Prompt 版本管理
+
+```
+所有 prompt 必须放在 application/ai/prompts。
+每个 prompt 必须有 prompt_version。
+daily_summaries 必须记录生成时使用的 prompt_version。
+prompt 更新必须附带 regression test。
+prompt 不得硬编码用户原始敏感数据上传云端。
+```
+
+### 10.5 Agent Skills 规范
+
+本项目借鉴 Google AI Edge Gallery 的 Agent Skills 设计，但必须改造成隐私优先、受控工具系统。
+
+核心原则：
+
+```
+AgentRuntime 只依赖 LlmRuntime。
+AgentTool 只调用 application service 或 repository interface。
+UI 不得直接执行 tool。
+tool 不得直接调用 Pigeon、数据库、HealthKit、Health Connect、LiteRT-LM、Gemma runtime。
+tool result 返回给模型前必须经过敏感度判断。
+高敏或 restricted 结果不得原样进入 prompt。
+需要改变数据、删除数据、上传数据、调用外部服务的 tool 必须用户确认。
+```
+
+第一阶段只允许 first-party skills：
+
+```
+get_recent_health_summary
+get_recent_mood_summary
+search_local_wellbeing_memory
+explain_privacy_redaction
+preview_cloud_payload
+get_model_status
+suggest_non_medical_habit_plan
+```
+
+禁止默认启用：
+
+```
+任意远程 skill
+任意 JS skill
+任意系统 intent / app automation
+任意未审查网络请求
+上传原始健康样本、原始聊天、原始日记的 tool
+绕过 PrivacyFilter 或 RedactionReport 的 tool
+```
+
+对应架构文档：
+
+```
+docs/AGENT_SKILLS_ARCHITECTURE.md
+```
+
+## 11. 医疗与安全边界
+
+### 11.1 产品定位
+
+使用：
+
+```
+wellbeing assistant
+lifestyle insight
+health trend summary
+self-reflection companion
+privacy-first personal health companion
+```
+
+避免：
+
+```
+medical diagnosis
+treatment
+therapy replacement
+clinical decision support
+prescription
+disease prediction
+emergency triage
+```
+
+### 11.2 禁止输出
+
+```
+疾病诊断
+药物剂量建议
+停药建议
+处方建议
+心理疾病定性诊断
+自伤鼓励
+极端节食建议
+严重症状延误就医建议
+```
+
+### 11.3 必须触发兜底
+
+```
+胸痛
+呼吸困难
+昏厥
+严重出血
+自杀意图
+伤害他人意图
+严重过敏反应
+疑似中风症状
+```
+
+兜底文案：
+
+```
+我不能判断这是否属于医疗紧急情况。请立即联系当地紧急服务，或联系可信任的人陪你获得帮助。
+```
+
+### 11.4 免责声明
+
+```
+This app provides general wellbeing insights based on data you choose to process locally. It does not provide medical diagnosis, treatment, prescription, or emergency support. For medical concerns, consult a qualified healthcare professional.
+```
+
+## 12. UI 页面规范
+
+必须具备：
+
+```
+Onboarding
+  - 说明端侧 AI
+  - 说明健康数据权限
+  - 说明本地加密
+  - 说明云端只接收脱敏摘要
+
+Health Permission
+  - 按数据类型说明用途
+  - 不一次性请求所有高敏权限
+  - 明确哪些数据只在本地处理
+
+Model Status
+  - 当前模型
+  - 模型大小
+  - 本地可用性
+  - 离线可用状态
+  - fallback 状态
+
+Dashboard
+  - 睡眠
+  - 活动
+  - 心率趋势
+  - mood check-in
+  - 本地 AI 摘要
+
+Privacy Review
+  - 显示即将上传的字段
+  - 显示不会上传的字段
+  - 显示 redaction report
+  - 用户确认后才上传
+
+Insights
+  - 本地 insight
+  - 云端脱敏 insight
+  - 明确标记来源
+
+Chat
+  - 本地 wellbeing coach
+  - 非诊断边界
+  - 本地模型状态
+```
+
+## 13. Android 原生规范
+
+### 13.1 技术栈
+
+```
+Kotlin
+Flutter Android embedding
+Pigeon generated HostApi
+Gemma 4 runtime adapter
+Health Connect Jetpack SDK
+Android Keystore
+WorkManager
+```
+
+### 13.2 Android Gradle 要求
+
+```
+minSdk: 28 或更高
+targetSdk: 当前 Play Store 要求版本
+compileSdk: 当前稳定 Android SDK
+Kotlin: 当前稳定版本
+```
+
+如果 Gemma 4 runtime 要求更高系统版本，以 runtime 实测结果为准。
+
+### 13.3 Android 权限
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+<!-- Health Connect permissions: only declare what is used -->
+<uses-permission android:name="android.permission.health.READ_STEPS" />
+<uses-permission android:name="android.permission.health.READ_SLEEP" />
+<uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+<uses-permission android:name="android.permission.health.READ_EXERCISE" />
+
+<!-- Optional background / historical read -->
+<uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+<uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
+```
+
+不得声明未使用的 Health Connect 权限。
+
+### 13.4 ProGuard
+
+使用 SQLCipher 时，`android/app/proguard-rules.pro` 必须包含：
+
+```
+-keep class net.sqlcipher.** { *; }
+```
+
+sqflite_sqlcipher 文档明确要求 release code shrinking 下添加该规则。([Dart packages](https://pub.dev/packages/sqflite_sqlcipher?utm_source=chatgpt.com))
+
+## 14. iOS 原生规范
+
+### 14.1 技术栈
+
+```
+Swift
+Flutter iOS embedding
+Pigeon generated HostApi
+Gemma 4 runtime adapter
+HealthKit
+Keychain
+CryptoKit
+BackgroundTasks
+```
+
+### 14.2 iOS Deployment Target
+
+建议：
+
+```
+iOS 17.0+
+```
+
+端侧 AI 和 HealthKit 的目标用户群体通常使用较新设备。为了降低模型运行时和系统 API 兼容成本，不建议支持过低 iOS 版本。
+
+### 14.3 Info.plist
+
+```xml
+<key>NSHealthShareUsageDescription</key>
+<string>We use your health data locally to generate private wellbeing insights.</string>
+
+<key>NSHealthUpdateUsageDescription</key>
+<string>We write health records only when you explicitly enable this feature.</string>
+
+<key>NSMicrophoneUsageDescription</key>
+<string>Voice input is processed locally if you enable voice features.</string>
+```
+
+若当前版本不做语音输入，不要申请麦克风权限。
+
+## 15. AI Coding Agent 规则
+
+本节是给 Codex / Claude 读取的约束。Agent 必须遵守。
+
+### 15.1 禁止事项
+
+```
+不得绕过 PrivacyFilter 上传任何数据。
+不得在日志中打印健康数据、prompt、response、数据库密钥。
+不得让 UI 直接调用 native API。
+不得让 UI 直接访问数据库。
+不得硬编码模型文件路径。
+不得硬编码用户隐私字段。
+不得修改 generated 文件。
+不得删除 migration。
+不得在未更新测试的情况下修改 prompt。
+不得引入未经说明的云端依赖。
+不得引入广告、analytics SDK 读取健康数据。
+```
+
+### 15.2 修改 native bridge 的流程
+
+```
+1. 修改 app/pigeon/*.dart。
+2. 执行 make gen。
+3. 更新 Dart adapter。
+4. 更新 Kotlin HostApi。
+5. 更新 Swift HostApi。
+6. 添加 bridge 单元测试或 smoke test。
+7. 更新 ARCHITECTURE.md。
+```
+
+### 15.3 新增健康数据类型的流程
+
+```
+1. 在 HealthMetricType 添加类型。
+2. 添加 sensitivity classification。
+3. 添加 HealthKit 映射。
+4. 添加 Health Connect 映射。
+5. 添加 permission 文案。
+6. 添加数据库 migration 如有必要。
+7. 添加 PrivacyFilter 测试。
+8. 更新用户隐私说明。
+```
+
+### 15.4 新增云端字段的流程
+
+```
+1. 修改 AnonymizedCloudPayload。
+2. 修改 RedactionReport。
+3. 添加 PrivacyFilter 测试。
+4. 修改 server Pydantic schema。
+5. 添加 redaction validator 测试。
+6. 确认字段不包含直接标识符、原始健康样本、原始文本。
+```
+
+## 16. 工具链
+
+### 16.1 本地开发工具 （需要时间配置）
+
+```
+Flutter stable via FVM
+Dart SDK from Flutter
+Android Studio
+Xcode
+CocoaPods
+Ruby + Bundler for Fastlane
+Python 3.12+
+uv for backend dependency management
+GitHub CLI
+Make
+```
+
+### 16.2 Makefile
+
+iOS build 使用 macOS runner，成本较高。正式环境应增加：
+
+```
+ios-build
+android-release-build
+fastlane-deploy-internal
+```
+
+## 17. 测试规范
+
+### 17.1 必测模块
+
+```
+PrivacyFilter
+RedactionReport
+HealthNormalizationService
+PromptBuilder
+LocalSummaryService
+ModelLifecycleService
+EncryptedDatabase migrations
+CloudPayloadBuilder
+MedicalSafetyGuard
+```
+
+### 17.2 Golden Test
+
+覆盖：
+
+```
+Privacy Review 页面
+Dashboard 页面
+Model Status 页面
+Cloud Insight 页面
+Health Permission 页面
+```
+
+### 17.3 Integration Test
+
+覆盖：
+
+```
+首次启动
+健康权限授权
+导入健康数据
+创建 mood log
+生成本地 summary
+进入 privacy review
+提交云端分析
+显示 insight
+取消模型生成
+模型 unload
+```
+
+### 17.4 Native Smoke Test
+
+Android / iOS 均需：
+
+```
+模型文件存在
+SHA-256 正确
+runtime initialize 成功
+ready prompt 成功
+generateOnce 成功
+cancel 成功
+unload 成功
+健康权限请求成功
+健康数据读取返回空集时不崩溃
+```
+
+## 18. 后续升级路线
+
+### Phase 1：基础产品化
+
+```
+完善模型管理器。
+支持模型下载、删除、校验。
+支持 fallback 模型。
+完成本地加密数据库。
+完成 HealthKit / Health Connect 原生 adapter。
+完成隐私预览。
+完成云端脱敏分析。
+```
+
+### Phase 2：长期健康画像
+
+```
+每日摘要。
+每周摘要。
+趋势检测。
+目标追踪。
+用户偏好记忆。
+本地健康画像版本化。
+```
+
+### Phase 3：本地 RAG 与记忆
+
+```
+本地 embedding 模型。
+daily summary embedding。
+本地向量检索。
+长期情绪和睡眠触发因素记忆。
+可删除、可导出、可重建的 memory store。
+```
+
+早期可用：
+
+```
+SQLite + cosine scan
+```
+
+后续可升级为：
+
+```
+ObjectBox vector
+SQLite vector extension
+自定义 HNSW index
+Rust local retrieval core
+```
+
+### Phase 4：多模态与语音
+
+```
+语音 check-in
+本地 STT
+本地 TTS
+VAD
+图片输入
+健康截图理解
+运动姿态或饮食图像分析
+```
+
+候选技术：
+
+```
+STT: sherpa-onnx / whisper.cpp
+TTS: Piper / Kokoro / platform TTS
+VAD: Silero VAD / WebRTC VAD
+Vision: Gemma 4 multimodal / MediaPipe Tasks Vision
+```
+
+### Phase 5：核心模块跨端复用升级
+
+Flutter 可以长期保留。若后续要提升核心逻辑复用与性能，可引入：
+
+```
+Rust Core
+  - PrivacyFilter
+  - local vector retrieval
+  - crypto helper
+  - health trend engine
+
+或 KMP Shared Core
+  - PromptBuilder
+  - ModelRegistry
+  - HealthSummaryEngine
+  - CloudPayloadBuilder
+  - AgentRuntime
+```
+
+不建议第一阶段重写 Flutter UI。升级应从核心算法模块开始，而不是 UI。
+
+## 19. 文档清单
+
+仓库必须包含：
+
+```
+README.md
+TECH_STACK.md
+ARCHITECTURE.md
+AI_CODING_GUIDE.md
+PRIVACY_MODEL.md
+MODEL_RUNTIME.md
+HEALTH_DATA_SCHEMA.md
+API_SPEC.md
+PROMPT_REGISTRY.md
+SAFETY_BOUNDARY.md
+RELEASE_CHECKLIST.md
+```
+
+`AI_CODING_GUIDE.md` 必须包含本文第 15 节的 agent 规则。
+
+## 20. 最终约束
+
+本项目的核心不是“能调用模型”，而是以下闭环：
+
+```
+用户健康数据在本地读取。
+本地模型生成个性化健康理解。
+敏感数据本地加密。
+上传前本地脱敏。
+云端只分析匿名结构化摘要。
+用户能审查上传内容。
+所有模型 runtime 可替换。
+所有隐私规则可测试。
+所有安全边界可回归。
+```
+
+实施团队和 AI agent 在任何改动中必须优先保证：
+
+```
+隐私边界
+数据加密
+本地优先
+模型可替换
+健康建议非诊断
+可测试性
+可回滚性
+```

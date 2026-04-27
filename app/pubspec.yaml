@@ -1,0 +1,82 @@
+name: gemma_local
+description: Privacy-first local wellbeing insights app.
+publish_to: "none"
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^3.0.3
+  riverpod_annotation: ^3.0.3
+
+  # Routing
+  go_router: ^17.2.2
+
+  # Data model and serialization
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+
+  # Network
+  dio: ^5.0.0
+  retrofit: ^4.0.0
+
+  # Local encrypted database
+  sqflite_sqlcipher: ^3.4.0
+  path_provider: ^2.1.0
+  path: ^1.9.0
+
+  # Secure storage
+  flutter_secure_storage: ^10.0.0
+  cryptography: ^2.7.0
+
+  # Health data
+  health: ^13.3.1
+  permission_handler: ^12.0.0
+
+  # Device and system
+  connectivity_plus: ^7.0.0
+  device_info_plus: ^12.0.0
+  package_info_plus: ^9.0.0
+
+  # Background and downloads
+  background_downloader: ^9.0.0
+  workmanager: ^0.9.0
+
+  # UI
+  cupertino_icons: ^1.0.8
+  fl_chart: ^1.0.0
+  flutter_markdown: ^0.7.0
+  intl: ^0.20.0
+  shimmer: ^3.0.0
+
+  # Notifications
+  flutter_local_notifications: ^19.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+  build_runner: ^2.5.0
+  freezed: ^3.0.0
+  json_serializable: ^6.9.0
+  mocktail: ^1.0.0
+  pigeon: ^26.0.0
+  retrofit_generator: ^10.0.0
+  riverpod_generator: ^3.0.3
+
+  flutter_lints: ^6.0.0
+  golden_toolkit: ^0.15.0
+  very_good_analysis: ^9.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/model_manifest.json

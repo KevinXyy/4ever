@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "models": [
+    {
+      "id": "gemma-4-e2b-it",
+      "display_name": "Gemma 4 E2B",
+      "file_name": "gemma-4-E2B-it.litertlm",
+      "sha256": "TO_BE_FILLED",
+      "size_bytes": 2583085056,
+      "min_memory_gb": 8,
+      "modalities": ["text", "image", "audio"],
+      "supports_thinking": true,
+      "max_context_tokens": 32000,
+      "default": true,
+      "platforms": ["android", "ios"]
+    },
+    {
+      "id": "gemma-4-e4b-it",
+      "display_name": "Gemma 4 E4B",
+      "file_name": "gemma-4-E4B-it.litertlm",
+      "sha256": "TO_BE_FILLED",
+      "size_bytes": 3654467584,
+      "min_memory_gb": 12,
+      "modalities": ["text", "image", "audio"],
+      "supports_thinking": true,
+      "max_context_tokens": 32000,
+      "default": false,
+      "platforms": ["android", "ios"]
+    },
+    {
+      "id": "gemma3-1b-it",
+      "display_name": "Gemma3 1B IT",
+      "file_name": "gemma3-1b-it-int4.litertlm",
+      "sha256": "TO_BE_FILLED",
+      "size_bytes": 584417280,
+      "min_memory_gb": 4,
+      "modalities": ["text"],
+      "supports_thinking": false,
+      "max_context_tokens": 4096,
+      "fallback": true,
+      "platforms": ["android", "ios"]
+    }
+  ]
+}
