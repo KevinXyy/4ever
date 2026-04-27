@@ -1,8 +1,4 @@
-enum AgentToolResultStatus {
-  succeeded,
-  failed,
-  denied,
-}
+enum AgentToolResultStatus { succeeded, failed, denied }
 
 class AgentToolResult {
   const AgentToolResult({

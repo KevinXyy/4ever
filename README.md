@@ -45,5 +45,20 @@ documentation work.
 
 ## Architecture Notes
 
+- First demo target: download/verify/load Gemma 4 E4B/E2B and complete a local chat.
+- Current model-management foundation is implemented in Dart and covered by tests.
 - [Agent Skills Architecture](docs/AGENT_SKILLS_ARCHITECTURE.md)
+- [Model Management Implementation Plan](docs/MODEL_MANAGEMENT_IMPLEMENTATION_PLAN.md)
 - [Environment Requirements](docs/ENVIRONMENT_REQUIREMENTS.md)
+
+## Current Verification
+
+```powershell
+.\.fvm\flutter_sdk\bin\flutter.bat pub get --directory app
+cd app
+..\.fvm\flutter_sdk\bin\flutter.bat analyze
+..\.fvm\flutter_sdk\bin\flutter.bat test
+```
+
+Latest manual result: analyze passed, model-management tests passed, and full
+Flutter tests passed.

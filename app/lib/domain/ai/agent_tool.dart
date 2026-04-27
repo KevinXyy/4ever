@@ -5,10 +5,7 @@ import 'agent_tool_result.dart';
 abstract interface class AgentTool {
   AgentToolDefinition get definition;
 
-  Future<AgentToolResult> execute(
-    AgentToolCall call,
-    AgentToolContext context,
-  );
+  Future<AgentToolResult> execute(AgentToolCall call, AgentToolContext context);
 }
 
 class AgentToolDefinition {

@@ -15,7 +15,7 @@ Gemma 4 是默认目标模型。
 Gemma 4 不直接暴露给业务层。
 业务层只依赖统一的 LlmRuntime 接口。
 Android / iOS 各自实现原生 runtime adapter。
-所有模型、云端 AI、fallback 模型都必须可替换。
+Gemma 4 E4B / E2B 档位和 runtime adapter 必须可替换。
 ```
 
 ## 1. 总体架构
@@ -93,7 +93,7 @@ Flutter 官方支持通过 platform channel 调用 Android Kotlin / Java 和 iOS
 | App 框架 | Flutter | 双端 UI、业务编排、页面导航 |
 | 主语言 | Dart | Flutter 业务层、领域模型、隐私处理 |
 | Android 原生 | Kotlin | Gemma runtime、Health Connect、Keystore、后台任务 |
-| iOS 原生 | Swift | Gemma runtime、HealthKit、Keychain、BackgroundTasks |
+| iOS 原生 | Swift + ObjC++ / C++ | Flutter/Pigeon 入口、LiteRT-LM C++ bridge、HealthKit、Keychain、BackgroundTasks |
 | 状态管理 | Riverpod | 异步状态、依赖注入、测试友好 |
 | 路由 | go_router | 声明式路由、deep link、ShellRoute |
 | 数据模型 | freezed + json_serializable | 不可变模型、序列化、copyWith |
@@ -103,8 +103,8 @@ Flutter 官方支持通过 platform channel 调用 Android Kotlin / Java 和 iOS
 | 密钥存储 | flutter_secure_storage + 原生 Keychain / Keystore | Flutter 层存储小型敏感数据；关键密钥应由原生层生成和保护 |
 | 健康数据 | HealthKit + Health Connect | iOS 与 Android 系统健康数据源 |
 | 健康数据 Flutter 包 | health | 可作为早期 adapter；该包是 Apple HealthKit 与 Google Health Connect 的 wrapper。([Dart packages](https://pub.dev/packages/health?utm_source=chatgpt.com)) |
-| 端侧模型 | Gemma 4 E2B | 默认主模型 |
-| 模型运行时 | LiteRT-LM / Google AI Edge / MediaPipe GenAI 相关 runtime | 平台端封装，不暴露给业务层 |
+| 端侧模型 | Gemma 4 E4B | 默认主模型，Gemma 4 E2B 作为低内存设备备选 |
+| 模型运行时 | LiteRT-LM | Android 用 Kotlin API；iOS 用 Swift/Pigeon 入口 + ObjC++/C++ bridge；平台端封装，不暴露给业务层 |
 | 云端服务 | FastAPI 或 Cloudflare Workers | 云端只接收脱敏摘要 |
 | 云端 AI | 可插拔 LLM API | 不接收原始健康数据 |
 | CI/CD | GitHub Actions + Fastlane | 静态检查、测试、构建、发布 |
@@ -325,7 +325,7 @@ app/
           health_sample_dao.dart
           mood_log_dao.dart
           daily_summary_dao.dart
-          model_registry_dao.dart
+          json_model_registry_store.dart
           cloud_job_dao.dart
 
       repositories/
@@ -550,27 +550,39 @@ Dart 层不得解析原生 SDK 原始错误字符串作为业务逻辑依据。
 
 ### 5.1 模型策略
 
-默认模型：
-
-```
-Gemma 4 E2B
-```
-
-高级设备可选：
+默认目标模型：
 
 ```
 Gemma 4 E4B
 ```
 
-fallback：
+低内存设备备选：
 
 ```
-Gemma3-1B-IT
-Gemma 3n E2B
-Cloud redacted analysis
+Gemma 4 E2B
 ```
 
 Edge Gallery 的 Android allowlist 中，Gemma 4 E2B 模型文件约 2.58GB，最低设备内存 8GB，支持图像、音频、thinking、32K context；Gemma 4 E4B 约 3.65GB，最低设备内存 12GB，同样支持图像、音频、thinking、32K context。
+
+第一版 demo 的唯一目标是跑通以下闭环：
+
+```
+manifest
+-> 选择 Gemma 4 E4B/E2B
+-> 检查内存/磁盘
+-> background_downloader 下载
+-> crypto SHA-256 校验
+-> 写 model_registry.json
+-> LlmRuntime.initialize
+-> smoke test
+-> demo chat
+```
+
+双端共用 Dart/Flutter 模型管理流程、`.litertlm` 模型格式和 `LlmRuntime`
+抽象。Android 与 iOS 不共用 Kotlin/Swift 代码，但底层均以 LiteRT-LM 为
+目标 runtime。iOS 第一版不等待 Swift-native SDK，采用 Swift/Pigeon 入口
++ ObjC++/C++ wrapper 调 LiteRT-LM C++ API；Swift API 成熟后仅替换 iOS
+adapter。
 
 ### 5.2 Runtime 抽象
 
@@ -636,7 +648,7 @@ final response = await ref.read(llmRuntimeProvider).generateOnce(
       "modalities": ["text", "image", "audio"],
       "supports_thinking": true,
       "max_context_tokens": 32000,
-      "default": true,
+      "default": false,
       "platforms": ["android", "ios"]
     },
     {
@@ -649,27 +661,20 @@ final response = await ref.read(llmRuntimeProvider).generateOnce(
       "modalities": ["text", "image", "audio"],
       "supports_thinking": true,
       "max_context_tokens": 32000,
-      "default": false,
-      "platforms": ["android", "ios"]
-    },
-    {
-      "id": "gemma3-1b-it",
-      "display_name": "Gemma3 1B IT",
-      "file_name": "gemma3-1b-it-int4.litertlm",
-      "sha256": "TO_BE_FILLED",
-      "size_bytes": 584417280,
-      "min_memory_gb": 4,
-      "modalities": ["text"],
-      "supports_thinking": false,
-      "max_context_tokens": 4096,
-      "fallback": true,
+      "default": true,
       "platforms": ["android", "ios"]
     }
   ]
 }
 ```
 
-### 5.4 模型生命周期 (待定）
+### 5.4 模型生命周期
+
+详细实现方案见：
+
+```
+docs/MODEL_MANAGEMENT_IMPLEMENTATION_PLAN.md
+```
 
 ```
 not_installed
@@ -689,7 +694,7 @@ unloaded
 2. 获取模型文件。
 3. 计算 SHA-256。
 4. 校验 manifest。
-5. 写入 model_registry。
+5. 写入 model_registry.json。
 6. 初始化原生 runtime。
 7. 执行 smoke test。
 8. 标记 ready。
@@ -713,7 +718,7 @@ Timeout: 30 seconds
 支持 Wi-Fi only 下载。
 支持断点续传。
 支持删除模型。
-支持 fallback 小模型。
+支持 Gemma 4 E2B / E4B 档位切换。
 支持模型完整性校验。
 ```
 
@@ -888,6 +893,14 @@ restricted / high 字段再做字段级加密。
 ```
 
 ### 7.3 数据库 schema
+
+第一版模型 demo 不创建 `model_registry` 数据库表，模型安装状态先写入：
+
+```
+Application Support/model_registry.json
+```
+
+等健康数据 SQLCipher 数据库稳定后，再评估是否把模型 registry 迁入数据库。
 
 ```sql
 CREATE TABLE health_samples (
@@ -1465,7 +1478,7 @@ Model Status
   - 模型大小
   - 本地可用性
   - 离线可用状态
-  - fallback 状态
+  - Gemma 4 E4B / E2B 档位状态
 
 Dashboard
   - 睡眠
@@ -1736,7 +1749,7 @@ unload 成功
 ```
 完善模型管理器。
 支持模型下载、删除、校验。
-支持 fallback 模型。
+支持 Gemma 4 E4B / E2B 档位选择。
 完成本地加密数据库。
 完成 HealthKit / Health Connect 原生 adapter。
 完成隐私预览。

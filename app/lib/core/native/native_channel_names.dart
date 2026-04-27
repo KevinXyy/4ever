@@ -6,4 +6,6 @@ final class NativeChannelNames {
   static const healthData = 'com.gemmalocal.native/health_data';
   static const crypto = 'com.gemmalocal.native/crypto';
   static const backgroundTask = 'com.gemmalocal.native/background_task';
+  static const deviceCapabilities =
+      'com.gemmalocal.native/device_capabilities';
 }

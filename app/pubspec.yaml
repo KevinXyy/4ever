@@ -33,6 +33,7 @@ dependencies:
 
   # Secure storage
   flutter_secure_storage: ^10.0.0
+  crypto: ^3.0.7
   cryptography: ^2.7.0
 
   # Health data

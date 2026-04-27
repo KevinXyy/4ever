@@ -1,9 +1,4 @@
-enum AgentSkillSource {
-  builtIn,
-  bundled,
-  userImported,
-  remote,
-}
+enum AgentSkillSource { builtIn, bundled, userImported, remote }
 
 class AgentSkill {
   const AgentSkill({
