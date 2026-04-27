@@ -5,6 +5,7 @@
 
 本方案用于下一步代码实现。第一版不做健康数据、不做 agent skills、不做云端分析，
 也不做自研下载器或 SQLCipher model registry。
+第一版按 offline-only App 实施，`server/` 仅作为 future optional 预留，不参与当前闭环。
 
 ## 1. 第一版闭环
 

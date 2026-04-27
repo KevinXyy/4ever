@@ -2,11 +2,11 @@
 
 版本：0.1
 
-项目形态：iOS / Android 双端 Flutter App，端侧 AI 优先，本地健康数据管理，本地隐私脱敏，云端仅分析脱敏后的结构化摘要。
+项目形态：iOS / Android 双端 Flutter App，第一版 **offline-only / 本地优先**。端侧 AI、本地健康数据管理、本地隐私脱敏和本地加密是当前主线；云端分析只作为 future optional 能力，默认关闭，不参与第一版 demo。
 
 ## 0. 背景与技术判断
 
-本项目选择 **Flutter** 作为跨平台 App 主框架，使用 **Dart** 实现 UI、业务编排、健康画像、隐私脱敏、云端同步和本地状态管理。Android 与 iOS 端的系统级能力通过原生插件接入：Android 使用 **Kotlin**，iOS 使用 **Swift**。
+本项目选择 **Flutter** 作为跨平台 App 主框架，使用 **Dart** 实现 UI、业务编排、健康画像、隐私脱敏和本地状态管理。Android 与 iOS 端的系统级能力通过原生插件接入：Android 使用 **Kotlin**，iOS 使用 **Swift**。
 
 端侧模型以 **Gemma 4 E4B** 为主模型，已在iPhone 17 上验证 安卓端待确认 
 
@@ -16,6 +16,8 @@ Gemma 4 不直接暴露给业务层。
 业务层只依赖统一的 LlmRuntime 接口。
 Android / iOS 各自实现原生 runtime adapter。
 Gemma 4 E4B / E2B 档位和 runtime adapter 必须可替换。
+第一版不做 server、不做云端分析、不做云端同步。
+任何云端能力必须后续单独设计、默认关闭、用户显式 opt-in。
 ```
 
 ## 1. 总体架构
@@ -38,7 +40,6 @@ Flutter App
 │   ├── HealthSummaryService
 │   ├── LocalCoachService
 │   ├── PrivacyFilterService
-│   ├── CloudAnalysisService
 │   ├── ModelLifecycleService
 │   └── RiskBoundaryService
 │
@@ -49,7 +50,6 @@ Flutter App
 │   ├── BehaviorEvent
 │   ├── DailySummary
 │   ├── UserHealthProfile
-│   ├── AnonymizedCloudPayload
 │   └── WellbeingInsight
 │
 ├── Data Layer
@@ -57,8 +57,7 @@ Flutter App
 │   ├── HealthRepository
 │   ├── MoodRepository
 │   ├── ModelRepository
-│   ├── SecureKeyRepository
-│   └── CloudRepository
+│   └── SecureKeyRepository
 │
 ├── Native Bridge Layer
 │   ├── LlmRuntimeApi
@@ -80,6 +79,12 @@ Flutter App
     ├── HealthKit Adapter
     ├── Keychain / CryptoKit Adapter
     └── BackgroundTasks Adapter
+
+Future Optional Cloud Extension
+  ├── Disabled by default
+  ├── Requires explicit user opt-in
+  ├── Receives only reviewed anonymized structured summaries
+  └── Must not receive raw health data, raw chat, raw journal, or identifiers
 ```
 
 Flutter 官方支持通过 platform channel 调用 Android Kotlin / Java 和 iOS Swift / Objective-C 原生代码；Pigeon 可生成类型安全的宿主 API，减少 Dart 与平台端手写字符串协议不一致的问题。([Flutter 文档](https://docs.flutter.dev/platform-integration/platform-channels?sid=TMUlf1&utm_source=chatgpt.com))
@@ -105,8 +110,8 @@ Flutter 官方支持通过 platform channel 调用 Android Kotlin / Java 和 iOS
 | 健康数据 Flutter 包 | health | 可作为早期 adapter；该包是 Apple HealthKit 与 Google Health Connect 的 wrapper。([Dart packages](https://pub.dev/packages/health?utm_source=chatgpt.com)) |
 | 端侧模型 | Gemma 4 E4B | 默认主模型，Gemma 4 E2B 作为低内存设备备选 |
 | 模型运行时 | LiteRT-LM | Android 用 Kotlin API；iOS 用 Swift/Pigeon 入口 + ObjC++/C++ bridge；平台端封装，不暴露给业务层 |
-| 云端服务 | FastAPI 或 Cloudflare Workers | 云端只接收脱敏摘要 |
-| 云端 AI | 可插拔 LLM API | 不接收原始健康数据 |
+| 云端服务 | Future optional | 第一版不启用；后续如加入，只能接收用户确认后的脱敏结构化摘要 |
+| 云端 AI | Future optional | 第一版不启用；不得接收原始健康数据、聊天、日记或身份标识 |
 | CI/CD | GitHub Actions + Fastlane | 静态检查、测试、构建、发布 |
 | 版本管理 | FVM + lockfile | 固定 Flutter SDK 与依赖版本 |
 
@@ -220,7 +225,7 @@ dev_dependencies:
   golden_toolkit: ^0.15.0
 ```
 
-Riverpod 当前包说明强调其适合异步代码、错误/加载状态处理，以及将逻辑与 UI 分离；这与本项目大量异步健康数据、模型加载、云端分析任务匹配。([Dart packages](https://pub.dev/packages/flutter_riverpod?utm_source=chatgpt.com))
+Riverpod 当前包说明强调其适合异步代码、错误/加载状态处理，以及将逻辑与 UI 分离；这与本项目大量异步健康数据、模型加载和本地 AI 编排任务匹配。([Dart packages](https://pub.dev/packages/flutter_riverpod?utm_source=chatgpt.com))
 
 go_router 是 Flutter 团队发布的声明式路由包，支持 deep link、路径参数、重定向、ShellRoute 和多 Navigator。([Dart packages](https://pub.dev/packages/go_router?utm_source=chatgpt.com))
 
@@ -999,7 +1004,7 @@ migration 必须支持从前两个 release 版本升级。
 migration 失败时不得删除数据库。
 ```
 
-## 8. 隐私、脱敏与云端边界
+## 8. 本地隐私、脱敏与可选外发边界
 
 ### 8.1 核心原则
 
@@ -1007,13 +1012,13 @@ migration 失败时不得删除数据库。
 原始健康数据不出端。
 原始聊天不出端。
 原始日记不出端。
-云端只接收结构化、去标识化、低粒度摘要。
-上传前必须经过本地 PrivacyFilter。
-上传前必须生成 RedactionReport。
-用户必须能查看本次上传的字段。
+第一版不做上传、不做云端分析、不做云端同步。
+PrivacyFilter 第一版用于本地 prompt 上下文裁剪和敏感度控制。
+RedactionReport 第一版用于本地审计和后续可解释隐私预览。
+任何后续外发能力必须默认关闭，用户显式 opt-in，并经过单独设计和测试。
 ```
 
-### 8.2 禁止上传
+### 8.2 永远不得外发
 
 ```
 姓名
@@ -1036,9 +1041,9 @@ migration 失败时不得删除数据库。
 任何可逆身份标识
 ```
 
-### 8.3 允许上传
+### 8.3 Future Optional 外发白名单
 
-允许上传的内容只能是脱敏摘要：
+第一版没有外发白名单。后续如果引入云端或导出能力，允许离开设备的内容只能是用户确认后的脱敏结构化摘要：
 
 ```json
 {
@@ -1084,9 +1089,9 @@ Sensitivity filtering
   ↓
 Generate RedactionReport
   ↓
-User Privacy Review
+Local Privacy Review
   ↓
-Encrypted upload
+Local prompt context / optional future reviewed export
 ```
 
 ### 8.5 RedactionReport
@@ -1104,7 +1109,7 @@ class RedactionReport {
 }
 ```
 
-上传条件：
+后续外发条件：
 
 ```
 containsDirectIdentifiers == false
@@ -1113,13 +1118,15 @@ containsRawJournalText == false
 containsPreciseLocation == false
 ```
 
-不满足即阻断上传。
+不满足即阻断外发。第一版没有外发入口。
 
-## 9. 云端 API 规范
+## 9. Future Optional 云端 API 规范
+
+本节不是第一版实施目标。`server/` 仅作为 future optional 预留，不参与当前离线 App demo、不参与默认产品闭环。
 
 ### 9.1 云端定位
 
-云端只做：
+如果后续引入云端，云端只做：
 
 ```
 长期趋势分析
@@ -1142,7 +1149,7 @@ containsPreciseLocation == false
 接收原始日记
 ```
 
-### 9.2 后端技术栈
+### 9.2 后端技术栈（Future Optional）
 
 ```
 Python 3.12+
@@ -1165,7 +1172,7 @@ Render
 Cloudflare Workers, if TypeScript backend is preferred
 ```
 
-### 9.3 后端目录
+### 9.3 后端目录（Future Optional）
 
 ```
 server/
@@ -1202,7 +1209,7 @@ server/
   Dockerfile
 ```
 
-### 9.4 API
+### 9.4 API（Future Optional）
 
 `POST /v1/analyze/weekly`
 
@@ -1254,7 +1261,7 @@ Response：
 }
 ```
 
-### 9.5 云端日志规则
+### 9.5 云端日志规则（Future Optional）
 
 ```
 不得记录 request body。
@@ -1345,7 +1352,7 @@ Output:
 每个 prompt 必须有 prompt_version。
 daily_summaries 必须记录生成时使用的 prompt_version。
 prompt 更新必须附带 regression test。
-prompt 不得硬编码用户原始敏感数据上传云端。
+prompt 不得硬编码用户原始敏感数据离开本机。
 ```
 
 ### 10.5 Agent Skills 规范
@@ -1371,7 +1378,6 @@ get_recent_health_summary
 get_recent_mood_summary
 search_local_wellbeing_memory
 explain_privacy_redaction
-preview_cloud_payload
 get_model_status
 suggest_non_medical_habit_plan
 ```
@@ -1466,7 +1472,7 @@ Onboarding
   - 说明端侧 AI
   - 说明健康数据权限
   - 说明本地加密
-  - 说明云端只接收脱敏摘要
+  - 说明第一版离线运行，不做云端分析
 
 Health Permission
   - 按数据类型说明用途
@@ -1488,14 +1494,13 @@ Dashboard
   - 本地 AI 摘要
 
 Privacy Review
-  - 显示即将上传的字段
-  - 显示不会上传的字段
+  - 显示本地 AI 将使用的字段
+  - 显示本地 AI 不会使用的字段
   - 显示 redaction report
-  - 用户确认后才上传
+  - 后续如加入外发能力，必须用户确认后才允许
 
 Insights
   - 本地 insight
-  - 云端脱敏 insight
   - 明确标记来源
 
 Chat
@@ -1605,7 +1610,7 @@ iOS 17.0+
 ### 15.1 禁止事项
 
 ```
-不得绕过 PrivacyFilter 上传任何数据。
+不得绕过 PrivacyFilter 让敏感数据进入 prompt 或离开本机。
 不得在日志中打印健康数据、prompt、response、数据库密钥。
 不得让 UI 直接调用 native API。
 不得让 UI 直接访问数据库。
@@ -1614,7 +1619,7 @@ iOS 17.0+
 不得修改 generated 文件。
 不得删除 migration。
 不得在未更新测试的情况下修改 prompt。
-不得引入未经说明的云端依赖。
+第一版不得引入云端依赖；后续云端能力必须单独设计、默认关闭并经用户 opt-in。
 不得引入广告、analytics SDK 读取健康数据。
 ```
 
@@ -1643,13 +1648,15 @@ iOS 17.0+
 8. 更新用户隐私说明。
 ```
 
-### 15.4 新增云端字段的流程
+### 15.4 新增 Future Optional 外发字段的流程
 
 ```
-1. 修改 AnonymizedCloudPayload。
+1. 明确该字段不属于第一版离线主线。
+2. 设计用户 opt-in 和本地隐私预览。
+3. 修改 future export payload。
 2. 修改 RedactionReport。
 3. 添加 PrivacyFilter 测试。
-4. 修改 server Pydantic schema。
+4. 如存在 server，再修改 server Pydantic schema。
 5. 添加 redaction validator 测试。
 6. 确认字段不包含直接标识符、原始健康样本、原始文本。
 ```
@@ -1666,7 +1673,7 @@ Xcode
 CocoaPods
 Ruby + Bundler for Fastlane
 Python 3.12+
-uv for backend dependency management
+uv for future optional backend dependency management
 GitHub CLI
 Make
 ```
@@ -1693,7 +1700,6 @@ PromptBuilder
 LocalSummaryService
 ModelLifecycleService
 EncryptedDatabase migrations
-CloudPayloadBuilder
 MedicalSafetyGuard
 ```
 
@@ -1705,7 +1711,6 @@ MedicalSafetyGuard
 Privacy Review 页面
 Dashboard 页面
 Model Status 页面
-Cloud Insight 页面
 Health Permission 页面
 ```
 
@@ -1720,7 +1725,6 @@ Health Permission 页面
 创建 mood log
 生成本地 summary
 进入 privacy review
-提交云端分析
 显示 insight
 取消模型生成
 模型 unload
@@ -1753,7 +1757,6 @@ unload 成功
 完成本地加密数据库。
 完成 HealthKit / Health Connect 原生 adapter。
 完成隐私预览。
-完成云端脱敏分析。
 ```
 
 ### Phase 2：长期健康画像
@@ -1828,7 +1831,7 @@ Rust Core
   - PromptBuilder
   - ModelRegistry
   - HealthSummaryEngine
-  - CloudPayloadBuilder
+  - FutureExportPayloadBuilder
   - AgentRuntime
 ```
 
@@ -1846,7 +1849,7 @@ AI_CODING_GUIDE.md
 PRIVACY_MODEL.md
 MODEL_RUNTIME.md
 HEALTH_DATA_SCHEMA.md
-API_SPEC.md
+API_SPEC.md (future optional cloud only)
 PROMPT_REGISTRY.md
 SAFETY_BOUNDARY.md
 RELEASE_CHECKLIST.md
@@ -1862,9 +1865,9 @@ RELEASE_CHECKLIST.md
 用户健康数据在本地读取。
 本地模型生成个性化健康理解。
 敏感数据本地加密。
-上传前本地脱敏。
-云端只分析匿名结构化摘要。
-用户能审查上传内容。
+本地 prompt 前进行隐私过滤。
+第一版不做云端分析、不做上传、不做云端同步。
+后续任何外发能力都必须默认关闭、用户显式 opt-in、且只能发送已审查的匿名结构化摘要。
 所有模型 runtime 可替换。
 所有隐私规则可测试。
 所有安全边界可回归。

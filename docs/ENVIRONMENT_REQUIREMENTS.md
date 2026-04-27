@@ -1,7 +1,7 @@
 # Development Environment Requirements
 
 This project prioritizes iOS first, but Windows can still be used for Flutter,
-Dart, backend, documentation, and shared application logic.
+Dart, documentation, and shared application logic.
 
 ## Windows Development Machine
 
@@ -10,7 +10,7 @@ Windows is suitable for:
 - Flutter/Dart business logic and UI development.
 - Domain, application, data, privacy, prompt, and safety modules.
 - Pigeon API definitions.
-- FastAPI backend development.
+- Future optional FastAPI backend development. The first release path is offline-only and does not require server work.
 - Flutter web preview.
 - Git and GitHub collaboration.
 
@@ -34,8 +34,8 @@ Minimum:
 - FVM 4.0.5.
 - Flutter 3.41.7 via FVM.
 - GitHub CLI 2.91.0.
-- uv.
-- Python 3.12.9 for backend work.
+- uv, only for future optional backend work.
+- Python 3.12.9, only for future optional backend work.
 - Chrome for Flutter web preview.
 
 Already expected by `scripts/setup-windows-dev.ps1`:
@@ -91,11 +91,11 @@ The script installs/configures:
 
 - FVM 4.0.5.
 - Flutter 3.41.7 through FVM.
-- uv.
-- Python 3.12.9 through uv.
+- uv, for future optional backend work.
+- Python 3.12.9 through uv, for future optional backend work.
 - CocoaPods.
 - Flutter package dependencies.
-- Backend uv environment.
+- Future optional backend uv environment.
 - Recommended VS Code extensions, if the `code` command is available.
 
 If Homebrew directories are not writable, the script asks for sudo once and
@@ -177,7 +177,8 @@ fvm flutter analyze
 fvm flutter run -d chrome
 ```
 
-Backend commands should use uv:
+Future optional backend commands should use uv. These are not required for the
+offline-only first release:
 
 ```powershell
 uv python install 3.12.9

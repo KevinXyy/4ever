@@ -40,12 +40,12 @@ make run-web
 ## iOS
 
 iOS builds, signing, HealthKit, Keychain, CocoaPods, and TestFlight require
-macOS and Xcode. Windows is used for shared Flutter/Dart, backend, and
-documentation work.
+macOS and Xcode. Windows is used for shared Flutter/Dart and documentation work.
 
 ## Architecture Notes
 
 - First demo target: download/verify/load Gemma 4 E4B/E2B and complete a local chat.
+- First release direction: offline-only app. `server/` is future optional and not part of the current demo path.
 - Current model-management foundation is implemented in Dart and covered by tests.
 - [Agent Skills Architecture](docs/AGENT_SKILLS_ARCHITECTURE.md)
 - [Model Management Implementation Plan](docs/MODEL_MANAGEMENT_IMPLEMENTATION_PLAN.md)
