@@ -66,6 +66,20 @@ Recommended Mac hardware:
 - Minimum: 16 GB RAM, 512 GB SSD.
 - Better: 24 GB or 32 GB RAM, 1 TB SSD.
 
+Intel Mac compatibility note:
+
+- Intel Macs remain supported for Flutter/Dart work and should support iOS
+  simulator builds for shared development.
+- As of 2026-04-28, CoreML-LLM v1.7.0 builds for iPhone device targets on the
+  current Intel Mac environment, but fails for x86_64 iOS Simulator because the
+  x86_64 simulator SDK lacks the Accelerate
+  `vDSP.convertElements(Float16 -> Float)` overload used by CoreML-LLM.
+- The planned fix is a small CoreML-LLM fork/PR that adds an x86_64 simulator
+  fallback conversion path. The app should use that fork branch until upstream
+  merges and tags the fix.
+- Apple Silicon teammates must still verify the arm64 simulator path after the
+  fork lands.
+
 The iOS owner should verify:
 
 ```bash
