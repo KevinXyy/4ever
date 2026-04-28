@@ -9,6 +9,9 @@ class ModelInstallRecord {
     required this.sha256,
     required this.sizeBytes,
     required this.sourceCommit,
+    required this.runtime,
+    required this.artifactType,
+    required this.revision,
     required this.status,
     required this.createdAt,
     required this.updatedAt,
@@ -22,6 +25,9 @@ class ModelInstallRecord {
   final String sha256;
   final int sizeBytes;
   final String sourceCommit;
+  final String runtime;
+  final String artifactType;
+  final String revision;
   final ModelInstallStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -42,6 +48,9 @@ class ModelInstallRecord {
       sha256: sha256,
       sizeBytes: sizeBytes,
       sourceCommit: sourceCommit,
+      runtime: runtime,
+      artifactType: artifactType,
+      revision: revision,
       status: status ?? this.status,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -58,6 +67,9 @@ class ModelInstallRecord {
       'sha256': sha256,
       'size_bytes': sizeBytes,
       'source_commit': sourceCommit,
+      'runtime': runtime,
+      'artifact_type': artifactType,
+      'revision': revision,
       'status': status.name,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -75,6 +87,9 @@ class ModelInstallRecord {
       sha256: json['sha256']! as String,
       sizeBytes: json['size_bytes']! as int,
       sourceCommit: json['source_commit']! as String,
+      runtime: json['runtime'] as String? ?? 'litert_lm',
+      artifactType: json['artifact_type'] as String? ?? 'litertlm_file',
+      revision: json['revision'] as String? ?? json['source_commit']! as String,
       status: ModelInstallStatus.values.byName(json['status']! as String),
       createdAt: DateTime.parse(json['created_at']! as String),
       updatedAt: DateTime.parse(json['updated_at']! as String),

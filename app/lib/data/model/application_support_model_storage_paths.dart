@@ -19,9 +19,12 @@ class ApplicationSupportModelStoragePaths implements ModelStoragePaths {
   Future<String> modelFilePath(ModelManifestEntry model) async {
     final root = await getApplicationSupportDirectory();
     final directory = Directory(
-      p.join(root.path, 'models', model.id, model.sourceCommit),
+      p.join(root.path, 'models', model.id, model.revision),
     );
     await directory.create(recursive: true);
+    if (model.isBundleArtifact) {
+      return directory.path;
+    }
     return p.join(directory.path, model.fileName);
   }
 }

@@ -5,6 +5,9 @@ class LlmModelConfig {
     required this.sha256,
     required this.sizeBytes,
     required this.minMemoryGb,
+    required this.runtime,
+    required this.artifactType,
+    required this.revision,
     required this.supportsText,
     required this.supportsImage,
     required this.supportsAudio,
@@ -17,6 +20,9 @@ class LlmModelConfig {
   final String sha256;
   final int sizeBytes;
   final int minMemoryGb;
+  final String runtime;
+  final String artifactType;
+  final String revision;
   final bool supportsText;
   final bool supportsImage;
   final bool supportsAudio;

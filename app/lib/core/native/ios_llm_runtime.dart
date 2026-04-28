@@ -11,13 +11,11 @@ import '../../domain/ai/llm_token_event.dart';
 import 'native_channel_names.dart';
 
 class IosLlmRuntime implements LlmRuntime {
-  IosLlmRuntime({
-    MethodChannel? methodChannel,
-    EventChannel? tokenChannel,
-  })  : _methodChannel = methodChannel ??
-            const MethodChannel(NativeChannelNames.llmRuntime),
-        _tokenChannel = tokenChannel ??
-            const EventChannel(NativeChannelNames.llmTokenStream);
+  IosLlmRuntime({MethodChannel? methodChannel, EventChannel? tokenChannel})
+    : _methodChannel =
+          methodChannel ?? const MethodChannel(NativeChannelNames.llmRuntime),
+      _tokenChannel =
+          tokenChannel ?? const EventChannel(NativeChannelNames.llmTokenStream);
 
   final MethodChannel _methodChannel;
   final EventChannel _tokenChannel;
@@ -57,10 +55,7 @@ class IosLlmRuntime implements LlmRuntime {
   }) async {
     final result = await _methodChannel.invokeMapMethod<String, Object?>(
       'generateOnce',
-      <String, Object?>{
-        'prompt': prompt,
-        'config': config.toNativeMap(),
-      },
+      <String, Object?>{'prompt': prompt, 'config': config.toNativeMap()},
     );
 
     return LlmResponse(
@@ -103,6 +98,9 @@ extension on LlmModelConfig {
       'sha256': sha256,
       'size_bytes': sizeBytes,
       'min_memory_gb': minMemoryGb,
+      'runtime': runtime,
+      'artifact_type': artifactType,
+      'revision': revision,
       'supports_text': supportsText,
       'supports_image': supportsImage,
       'supports_audio': supportsAudio,
